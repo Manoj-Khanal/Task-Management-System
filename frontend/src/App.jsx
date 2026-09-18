@@ -3,6 +3,8 @@ import "./App.css";
 import Login from "./Login.jsx";
 import Register from "./Register.jsx";
 
+const API_URL = "https://task-management-system-1gvk.onrender.com";
+
 function App() {
 
     // =========================
@@ -14,9 +16,9 @@ function App() {
     );
 
     const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
-});
+        const savedUser = localStorage.getItem("user");
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
 
     const [showRegister, setShowRegister] = useState(false);
 
@@ -51,32 +53,25 @@ function App() {
     const [editingTask, setEditingTask] = useState(null);
 
     // =========================
-    // Get Token
-    // =========================
-
-    const token = localStorage.getItem("token");
-
-
-    // =========================
     // Dashboard Statistics
     // =========================
 
     const totalTasks = tasks.length;
 
     const todoTasks = tasks.filter(
-        task => task.status === "todo"
+        (task) => task.status === "todo"
     ).length;
 
     const inProgressTasks = tasks.filter(
-        task => task.status === "in-progress"
+        (task) => task.status === "in-progress"
     ).length;
 
     const completedTasks = tasks.filter(
-        task => task.status === "completed"
+        (task) => task.status === "completed"
     ).length;
 
     const highPriorityTasks = tasks.filter(
-        task => task.priority === "high"
+        (task) => task.priority === "high"
     ).length;
 
     const completionPercentage =
@@ -85,7 +80,6 @@ function App() {
             : Math.round(
                 (completedTasks / totalTasks) * 100
             );
-
 
     // =========================
     // Search & Filter
@@ -113,7 +107,6 @@ function App() {
         );
     });
 
-
     // =========================
     // Get Tasks
     // =========================
@@ -129,8 +122,10 @@ function App() {
         try {
 
             const response = await fetch(
-                "https://task-management-system-1gvk.onrender.com",
+                `${API_URL}/api/tasks`,
                 {
+                    method: "GET",
+
                     headers: {
                         Authorization: `Bearer ${currentToken}`
                     }
@@ -141,27 +136,28 @@ function App() {
 
             if (response.ok) {
 
-                setTasks(data.tasks);
+                setTasks(data.tasks || []);
 
             } else {
 
-                alert(data.message);
+                alert(data.message || "Unable to fetch tasks");
 
                 if (response.status === 401) {
 
                     localStorage.removeItem("token");
-                    setIsLoggedIn(false);
+                    localStorage.removeItem("user");
 
+                    setUser(null);
+                    setIsLoggedIn(false);
                 }
             }
 
         } catch (error) {
 
-            console.error(error);
+            console.error("Fetch tasks error:", error);
 
         }
     };
-
 
     // =========================
     // Add / Update Task
@@ -187,7 +183,7 @@ function App() {
             if (editingTask) {
 
                 const response = await fetch(
-                    `https://task-management-system-1gvk.onrender.com/api/tasks/${id}`,
+                    `${API_URL}/api/tasks/${editingTask._id}`,
                     {
                         method: "PUT",
 
@@ -218,11 +214,11 @@ function App() {
                     setPriority("medium");
                     setDueDate("");
 
-                    fetchTasks();
+                    await fetchTasks();
 
                 } else {
 
-                    alert(data.message);
+                    alert(data.message || "Unable to update task");
 
                 }
 
@@ -235,7 +231,7 @@ function App() {
             else {
 
                 const response = await fetch(
-                    "https://task-management-system-1gvk.onrender.com",
+                    `${API_URL}/api/tasks`,
                     {
                         method: "POST",
 
@@ -264,24 +260,23 @@ function App() {
                     setPriority("medium");
                     setDueDate("");
 
-                    fetchTasks();
+                    await fetchTasks();
 
                 } else {
 
-                    alert(data.message);
+                    alert(data.message || "Unable to create task");
 
                 }
             }
 
         } catch (error) {
 
-            console.error(error);
+            console.error("Task request error:", error);
 
             alert("Unable to connect to server");
 
         }
     };
-
 
     // =========================
     // Delete Task
@@ -307,7 +302,7 @@ function App() {
         try {
 
             const response = await fetch(
-                `https://task-management-system-1gvk.onrender.com/api/tasks/${id}`,
+                `${API_URL}/api/tasks/${id}`,
                 {
                     method: "DELETE",
 
@@ -321,23 +316,22 @@ function App() {
 
             if (response.ok) {
 
-                fetchTasks();
+                await fetchTasks();
 
             } else {
 
-                alert(data.message);
+                alert(data.message || "Unable to delete task");
 
             }
 
         } catch (error) {
 
-            console.error(error);
+            console.error("Delete task error:", error);
 
             alert("Unable to connect to server");
 
         }
     };
-
 
     // =========================
     // Edit Task
@@ -365,6 +359,20 @@ function App() {
             });
     };
 
+    // =========================
+    // Cancel Edit
+    // =========================
+
+    const handleCancelEdit = () => {
+
+        setEditingTask(null);
+
+        setTitle("");
+        setDescription("");
+        setStatus("todo");
+        setPriority("medium");
+        setDueDate("");
+    };
 
     // =========================
     // Load Tasks After Login
@@ -378,39 +386,50 @@ function App() {
 
     }, [isLoggedIn]);
 
-
     // =========================
-    // Show Login
+    // Show Login / Register
     // =========================
 
-if (!isLoggedIn) {
+    if (!isLoggedIn) {
 
-    if (showRegister) {
+        if (showRegister) {
+
+            return (
+                <Register
+                    onRegister={() => {
+                        setShowRegister(false);
+                    }}
+
+                    goToLogin={() => {
+                        setShowRegister(false);
+                    }}
+                />
+            );
+        }
 
         return (
-            <Register
-                onRegister={() => {
-                    setShowRegister(false);
+            <Login
+                onLogin={(loggedInUser) => {
+
+                    if (loggedInUser) {
+
+                        setUser(loggedInUser);
+
+                        localStorage.setItem(
+                            "user",
+                            JSON.stringify(loggedInUser)
+                        );
+                    }
+
+                    setIsLoggedIn(true);
                 }}
-                goToLogin={() => {
-                    setShowRegister(false);
+
+                goToRegister={() => {
+                    setShowRegister(true);
                 }}
             />
         );
-
     }
-
-    return (
-<Login
-    onLogin={(loggedInUser) => {
-        setUser(loggedInUser);
-        setIsLoggedIn(true);
-    }}
-    goToRegister={() => {
-        setShowRegister(true);
-    }}
-/> );
-}
 
     // =========================
     // Dashboard
@@ -438,7 +457,6 @@ if (!isLoggedIn) {
 
                 </div>
 
-
                 <nav className="navigation">
 
                     <a className="nav-item active">
@@ -451,7 +469,6 @@ if (!isLoggedIn) {
 
                     </a>
 
-
                     <a className="nav-item">
 
                         <span>
@@ -461,7 +478,6 @@ if (!isLoggedIn) {
                         My Tasks
 
                     </a>
-
 
                     <a className="nav-item">
 
@@ -475,19 +491,20 @@ if (!isLoggedIn) {
 
                 </nav>
 
-
                 <div className="sidebar-bottom">
 
                     <div className="user-box">
 
                         <div className="avatar">
-                            M
+                            {user?.name
+                                ? user.name.charAt(0).toUpperCase()
+                                : "U"}
                         </div>
 
                         <div>
 
                             <strong>
-                                Manoj
+                                {user?.name || "User"}
                             </strong>
 
                             <small>
@@ -498,19 +515,17 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     <button
                         className="logout-button"
                         onClick={() => {
 
                             localStorage.removeItem("token");
                             localStorage.removeItem("user");
+
                             setUser(null);
-                            setTasks([]);
                             setTasks([]);
 
                             setIsLoggedIn(false);
-
                         }}
                     >
                         Logout
@@ -520,13 +535,11 @@ if (!isLoggedIn) {
 
             </aside>
 
-
             {/* ========================= */}
             {/* Main Content */}
             {/* ========================= */}
 
             <main className="main-content">
-
 
                 {/* ========================= */}
                 {/* Topbar */}
@@ -546,24 +559,24 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     <div className="topbar-right">
 
                         <div className="notification">
                             🔔
                         </div>
 
-
                         <div className="profile">
 
                             <div className="avatar">
-                                M
+                                {user?.name
+                                    ? user.name.charAt(0).toUpperCase()
+                                    : "U"}
                             </div>
 
                             <div>
 
                                 <strong>
-                                    Manoj
+                                    {user?.name || "User"}
                                 </strong>
 
                                 <small>
@@ -578,7 +591,6 @@ if (!isLoggedIn) {
 
                 </header>
 
-
                 {/* ========================= */}
                 {/* Welcome */}
                 {/* ========================= */}
@@ -587,14 +599,15 @@ if (!isLoggedIn) {
 
                     <div>
 
-                        <h2> Hi! {user?.name || "User"} 👋</h2>
+                        <h2>
+                            Hi! {user?.name || "User"} 👋
+                        </h2>
 
                         <p>
                             Here's what's happening with your tasks today.
                         </p>
 
                     </div>
-
 
                     <button
                         className="add-button"
@@ -611,13 +624,11 @@ if (!isLoggedIn) {
 
                 </section>
 
-
                 {/* ========================= */}
                 {/* Statistics */}
                 {/* ========================= */}
 
                 <section className="stats-grid">
-
 
                     <div className="stat-card">
 
@@ -639,7 +650,6 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     <div className="stat-card">
 
                         <div className="stat-icon">
@@ -660,7 +670,6 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     <div className="stat-card">
 
                         <div className="stat-icon">
@@ -680,7 +689,6 @@ if (!isLoggedIn) {
                         </div>
 
                     </div>
-
 
                     <div className="stat-card">
 
@@ -704,7 +712,6 @@ if (!isLoggedIn) {
 
                 </section>
 
-
                 {/* ========================= */}
                 {/* Task Progress */}
                 {/* ========================= */}
@@ -725,13 +732,11 @@ if (!isLoggedIn) {
 
                         </div>
 
-
                         <strong>
                             {completionPercentage}%
                         </strong>
 
                     </div>
-
 
                     <div className="progress-bar">
 
@@ -743,7 +748,6 @@ if (!isLoggedIn) {
                         ></div>
 
                     </div>
-
 
                     <div className="progress-info">
 
@@ -758,7 +762,6 @@ if (!isLoggedIn) {
                     </div>
 
                 </section>
-
 
                 {/* ========================= */}
                 {/* Add / Edit Task */}
@@ -789,12 +792,10 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     <form
                         className="task-form"
                         onSubmit={handleAddTask}
                     >
-
 
                         <div className="form-group">
 
@@ -814,7 +815,6 @@ if (!isLoggedIn) {
 
                         </div>
 
-
                         <div className="form-group">
 
                             <label>
@@ -831,9 +831,7 @@ if (!isLoggedIn) {
 
                         </div>
 
-
                         <div className="form-row">
-
 
                             <div className="form-group">
 
@@ -864,7 +862,6 @@ if (!isLoggedIn) {
 
                             </div>
 
-
                             <div className="form-group">
 
                                 <label>
@@ -894,7 +891,6 @@ if (!isLoggedIn) {
 
                             </div>
 
-
                             <div className="form-group">
 
                                 <label>
@@ -913,7 +909,6 @@ if (!isLoggedIn) {
 
                         </div>
 
-
                         <button
                             type="submit"
                             className="create-button"
@@ -923,23 +918,12 @@ if (!isLoggedIn) {
                                 : "Create Task"}
                         </button>
 
-
                         {editingTask && (
 
                             <button
                                 type="button"
                                 className="reset-button"
-                                onClick={() => {
-
-                                    setEditingTask(null);
-
-                                    setTitle("");
-                                    setDescription("");
-                                    setStatus("todo");
-                                    setPriority("medium");
-                                    setDueDate("");
-
-                                }}
+                                onClick={handleCancelEdit}
                             >
                                 Cancel Edit
                             </button>
@@ -950,13 +934,11 @@ if (!isLoggedIn) {
 
                 </section>
 
-
                 {/* ========================= */}
                 {/* Tasks */}
                 {/* ========================= */}
 
                 <section className="tasks-section">
-
 
                     <div className="section-heading">
 
@@ -977,13 +959,11 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     {/* ========================= */}
                     {/* Search & Filters */}
                     {/* ========================= */}
 
                     <div className="filter-section">
-
 
                         <input
                             type="text"
@@ -993,7 +973,6 @@ if (!isLoggedIn) {
                                 setSearch(e.target.value)
                             }
                         />
-
 
                         <select
                             value={filterStatus}
@@ -1020,7 +999,6 @@ if (!isLoggedIn) {
 
                         </select>
 
-
                         <select
                             value={filterPriority}
                             onChange={(e) =>
@@ -1046,7 +1024,6 @@ if (!isLoggedIn) {
 
                         </select>
 
-
                         <button
                             className="reset-button"
                             onClick={() => {
@@ -1062,13 +1039,11 @@ if (!isLoggedIn) {
 
                     </div>
 
-
                     {/* ========================= */}
                     {/* Task List */}
                     {/* ========================= */}
 
                     <div className="task-list">
-
 
                         {filteredTasks.length === 0 ? (
 
@@ -1097,7 +1072,6 @@ if (!isLoggedIn) {
                                     key={task._id}
                                 >
 
-
                                     <div className="task-main">
 
                                         <div className="task-check">
@@ -1107,7 +1081,6 @@ if (!isLoggedIn) {
                                                 : "○"}
 
                                         </div>
-
 
                                         <div>
 
@@ -1124,9 +1097,7 @@ if (!isLoggedIn) {
 
                                     </div>
 
-
                                     <div className="task-details">
-
 
                                         <span
                                             className={`status-badge ${task.status}`}
@@ -1140,13 +1111,11 @@ if (!isLoggedIn) {
 
                                         </span>
 
-
                                         <span
                                             className={`priority-badge ${task.priority}`}
                                         >
                                             {task.priority}
                                         </span>
-
 
                                         <span className="due-date">
 
@@ -1160,7 +1129,6 @@ if (!isLoggedIn) {
 
                                         </span>
 
-
                                         {/* Edit */}
 
                                         <button
@@ -1171,7 +1139,6 @@ if (!isLoggedIn) {
                                         >
                                             ✏️
                                         </button>
-
 
                                         {/* Delete */}
 

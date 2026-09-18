@@ -129,7 +129,7 @@ function App() {
         try {
 
             const response = await fetch(
-                "http://localhost:5000/api/tasks",
+                "https://task-management-system-1gvk.onrender.com",
                 {
                     headers: {
                         Authorization: `Bearer ${currentToken}`
@@ -187,7 +187,7 @@ function App() {
             if (editingTask) {
 
                 const response = await fetch(
-                    `http://localhost:5000/api/tasks/${editingTask._id}`,
+                    `https://task-management-system-1gvk.onrender.com/api/tasks/${id}`,
                     {
                         method: "PUT",
 
@@ -235,7 +235,7 @@ function App() {
             else {
 
                 const response = await fetch(
-                    "http://localhost:5000/api/tasks",
+                    "https://task-management-system-1gvk.onrender.com",
                     {
                         method: "POST",
 
@@ -307,7 +307,7 @@ function App() {
         try {
 
             const response = await fetch(
-                `http://localhost:5000/api/tasks/${id}`,
+                `https://task-management-system-1gvk.onrender.com/api/tasks/${id}`,
                 {
                     method: "DELETE",
 

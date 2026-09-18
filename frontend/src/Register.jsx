@@ -13,7 +13,7 @@ function Register({ onRegister, goToLogin }) {
         try {
 
             const response = await fetch(
-                "http://localhost:5000/api/auth/register",
+                "https://task-management-system-1gvk.onrender.com/api/auth/register",
                 {
                     method: "POST",
 

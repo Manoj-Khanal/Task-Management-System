@@ -12,7 +12,7 @@ function Login({ onLogin, goToRegister }) {
         try {
 
             const response = await fetch(
-                "http://localhost:5000/api/auth/login",
+                "https://task-management-system-1gvk.onrender.com/api/auth/login",
                 {
                     method: "POST",
 

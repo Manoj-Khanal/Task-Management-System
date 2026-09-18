@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import Login from "./Login.jsx";
 import Register from "./Register.jsx";
@@ -6,6 +6,7 @@ import Register from "./Register.jsx";
 const API_URL = "https://task-management-system-1gvk.onrender.com";
 
 function App() {
+
     // =====================================================
     // AUTHENTICATION
     // =====================================================
@@ -56,16 +57,18 @@ function App() {
     const [dueDate, setDueDate] = useState("");
 
     // =====================================================
-    // EDIT
+    // EDIT & MODAL
     // =====================================================
 
     const [editingTask, setEditingTask] = useState(null);
-
-    // =====================================================
-    // MODAL
-    // =====================================================
-
     const [showTaskModal, setShowTaskModal] = useState(false);
+
+    // =====================================================
+    // NOTIFICATIONS
+    // =====================================================
+
+    const [showNotifications, setShowNotifications] = useState(false);
+    const notificationRef = useRef(null);
 
     // =====================================================
     // LOADING
@@ -106,6 +109,7 @@ function App() {
 
     const filteredTasks = useMemo(() => {
         return tasks.filter((task) => {
+
             const matchesSearch = task.title
                 ?.toLowerCase()
                 .includes(search.toLowerCase());
@@ -131,13 +135,134 @@ function App() {
         filterPriority
     ]);
 
-    // =====================================================
-    // IMPORTANT TASKS
-    // =====================================================
-
     const importantTasks = tasks.filter(
         (task) => task.priority === "high"
     );
+
+    // =====================================================
+    // NOTIFICATION LOGIC
+    // =====================================================
+
+    const notifications = useMemo(() => {
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        const sevenDays = new Date(today);
+        sevenDays.setDate(today.getDate() + 7);
+
+        const list = [];
+
+        tasks.forEach((task) => {
+
+            if (
+                task.dueDate &&
+                task.status !== "completed"
+            ) {
+                const due = new Date(task.dueDate);
+                due.setHours(0, 0, 0, 0);
+
+                if (due < today) {
+                    list.push({
+                        id: `overdue-${task._id}`,
+                        type: "overdue",
+                        icon: "🔴",
+                        title: "Task overdue",
+                        message: `"${task.title}" is overdue`
+                    });
+                }
+                else if (due.getTime() === today.getTime()) {
+                    list.push({
+                        id: `today-${task._id}`,
+                        type: "today",
+                        icon: "🟠",
+                        title: "Due today",
+                        message: `"${task.title}" is due today`
+                    });
+                }
+                else if (
+                    due > today &&
+                    due <= sevenDays
+                ) {
+                    list.push({
+                        id: `soon-${task._id}`,
+                        type: "soon",
+                        icon: "🟡",
+                        title: "Upcoming deadline",
+                        message: `"${task.title}" is due soon`
+                    });
+                }
+            }
+
+            if (
+                task.priority === "high" &&
+                task.status !== "completed"
+            ) {
+                list.push({
+                    id: `priority-${task._id}`,
+                    type: "priority",
+                    icon: "⭐",
+                    title: "High priority",
+                    message: `"${task.title}" needs attention`
+                });
+            }
+
+            if (
+                task.status === "completed"
+            ) {
+                list.push({
+                    id: `completed-${task._id}`,
+                    type: "completed",
+                    icon: "🟢",
+                    title: "Task completed",
+                    message: `"${task.title}" is completed`
+                });
+            }
+
+        });
+
+        return list.slice(0, 8);
+
+    }, [tasks]);
+
+    const notificationCount = notifications.filter(
+        (item) =>
+            item.type !== "completed"
+    ).length;
+
+    // =====================================================
+    // CLOSE NOTIFICATION WHEN CLICK OUTSIDE
+    // =====================================================
+
+    useEffect(() => {
+
+        const handleOutsideClick = (event) => {
+
+            if (
+                notificationRef.current &&
+                !notificationRef.current.contains(event.target)
+            ) {
+                setShowNotifications(false);
+            }
+
+        };
+
+        document.addEventListener(
+            "mousedown",
+            handleOutsideClick
+        );
+
+        return () => {
+            document.removeEventListener(
+                "mousedown",
+                handleOutsideClick
+            );
+        };
+
+    }, []);
 
     // =====================================================
     // RESET FORM
@@ -152,18 +277,10 @@ function App() {
         setEditingTask(null);
     };
 
-    // =====================================================
-    // OPEN ADD MODAL
-    // =====================================================
-
     const openAddModal = () => {
         resetForm();
         setShowTaskModal(true);
     };
-
-    // =====================================================
-    // CLOSE MODAL
-    // =====================================================
 
     const closeTaskModal = () => {
         setShowTaskModal(false);
@@ -175,7 +292,9 @@ function App() {
     // =====================================================
 
     const fetchTasks = async () => {
-        const currentToken = localStorage.getItem("token");
+
+        const currentToken =
+            localStorage.getItem("token");
 
         if (!currentToken) {
             setIsLoggedIn(false);
@@ -183,6 +302,7 @@ function App() {
         }
 
         try {
+
             setLoading(true);
 
             const response = await fetch(
@@ -190,7 +310,8 @@ function App() {
                 {
                     method: "GET",
                     headers: {
-                        Authorization: `Bearer ${currentToken}`
+                        Authorization:
+                            `Bearer ${currentToken}`
                     }
                 }
             );
@@ -199,14 +320,18 @@ function App() {
 
             if (response.ok) {
                 setTasks(data.tasks || []);
-            } else {
+            }
+            else {
+
                 if (response.status === 401) {
+
                     localStorage.removeItem("token");
                     localStorage.removeItem("user");
 
                     setUser(null);
                     setTasks([]);
                     setIsLoggedIn(false);
+
                 }
 
                 alert(
@@ -214,18 +339,21 @@ function App() {
                     "Unable to fetch tasks"
                 );
             }
-        } catch (error) {
-            console.error(
-                "Fetch tasks error:",
-                error
-            );
+
+        }
+        catch (error) {
+
+            console.error(error);
 
             alert(
-                "Unable to connect to server. Please try again."
+                "Unable to connect to server."
             );
-        } finally {
+
+        }
+        finally {
             setLoading(false);
         }
+
     };
 
     // =====================================================
@@ -233,6 +361,7 @@ function App() {
     // =====================================================
 
     const handleTaskSubmit = async (e) => {
+
         e.preventDefault();
 
         const currentToken =
@@ -244,18 +373,16 @@ function App() {
         }
 
         if (!title.trim()) {
-            alert("Please enter a task title.");
+            alert("Please enter task title.");
             return;
         }
 
         try {
+
             setLoading(true);
 
-            // =================================================
-            // UPDATE
-            // =================================================
-
             if (editingTask) {
+
                 const response = await fetch(
                     `${API_URL}/api/tasks/${editingTask._id}`,
                     {
@@ -270,9 +397,8 @@ function App() {
                         },
 
                         body: JSON.stringify({
-                            title: title.trim(),
-                            description:
-                                description.trim(),
+                            title,
+                            description,
                             status,
                             priority,
                             dueDate
@@ -284,21 +410,14 @@ function App() {
 
                 if (response.ok) {
                     await fetchTasks();
-
                     closeTaskModal();
-                } else {
-                    alert(
-                        data.message ||
-                        "Unable to update task"
-                    );
+                }
+                else {
+                    alert(data.message);
                 }
 
                 return;
             }
-
-            // =================================================
-            // CREATE
-            // =================================================
 
             const response = await fetch(
                 `${API_URL}/api/tasks`,
@@ -314,9 +433,8 @@ function App() {
                     },
 
                     body: JSON.stringify({
-                        title: title.trim(),
-                        description:
-                            description.trim(),
+                        title,
+                        description,
                         status,
                         priority,
                         dueDate
@@ -328,26 +446,20 @@ function App() {
 
             if (response.ok) {
                 await fetchTasks();
-
                 closeTaskModal();
-            } else {
-                alert(
-                    data.message ||
-                    "Unable to create task"
-                );
             }
-        } catch (error) {
-            console.error(
-                "Task request error:",
-                error
-            );
+            else {
+                alert(data.message);
+            }
 
-            alert(
-                "Unable to connect to server."
-            );
-        } finally {
+        }
+        catch {
+            alert("Unable to connect to server.");
+        }
+        finally {
             setLoading(false);
         }
+
     };
 
     // =====================================================
@@ -355,24 +467,17 @@ function App() {
     // =====================================================
 
     const handleDeleteTask = async (id) => {
-        const confirmDelete = window.confirm(
-            "Are you sure you want to delete this task?"
-        );
 
-        if (!confirmDelete) {
-            return;
-        }
+        if (
+            !window.confirm(
+                "Delete this task?"
+            )
+        ) return;
 
         const currentToken =
             localStorage.getItem("token");
 
-        if (!currentToken) {
-            setIsLoggedIn(false);
-            return;
-        }
-
         try {
-            setLoading(true);
 
             const response = await fetch(
                 `${API_URL}/api/tasks/${id}`,
@@ -386,28 +491,15 @@ function App() {
                 }
             );
 
-            const data = await response.json();
-
             if (response.ok) {
                 await fetchTasks();
-            } else {
-                alert(
-                    data.message ||
-                    "Unable to delete task"
-                );
             }
-        } catch (error) {
-            console.error(
-                "Delete task error:",
-                error
-            );
 
-            alert(
-                "Unable to connect to server."
-            );
-        } finally {
-            setLoading(false);
         }
+        catch {
+            alert("Unable to delete task.");
+        }
+
     };
 
     // =====================================================
@@ -415,20 +507,13 @@ function App() {
     // =====================================================
 
     const handleEditTask = (task) => {
+
         setEditingTask(task);
 
         setTitle(task.title || "");
-        setDescription(
-            task.description || ""
-        );
-
-        setStatus(
-            task.status || "todo"
-        );
-
-        setPriority(
-            task.priority || "medium"
-        );
+        setDescription(task.description || "");
+        setStatus(task.status || "todo");
+        setPriority(task.priority || "medium");
 
         setDueDate(
             task.dueDate
@@ -437,11 +522,8 @@ function App() {
         );
 
         setShowTaskModal(true);
-    };
 
-    // =====================================================
-    // RESET FILTERS
-    // =====================================================
+    };
 
     const resetFilters = () => {
         setSearch("");
@@ -449,27 +531,23 @@ function App() {
         setFilterPriority("all");
     };
 
-    // =====================================================
-    // NAVIGATION
-    // =====================================================
-
     const handleNavigation = (page) => {
+
         setActivePage(page);
 
         window.scrollTo({
             top: 0,
             behavior: "smooth"
         });
+
     };
 
-    // =====================================================
-    // LOAD TASKS AFTER LOGIN
-    // =====================================================
-
     useEffect(() => {
+
         if (isLoggedIn) {
             fetchTasks();
         }
+
     }, [isLoggedIn]);
 
     // =====================================================
@@ -477,15 +555,16 @@ function App() {
     // =====================================================
 
     if (!isLoggedIn) {
+
         if (showRegister) {
             return (
                 <Register
-                    onRegister={() => {
-                        setShowRegister(false);
-                    }}
-                    goToLogin={() => {
-                        setShowRegister(false);
-                    }}
+                    onRegister={() =>
+                        setShowRegister(false)
+                    }
+                    goToLogin={() =>
+                        setShowRegister(false)
+                    }
                 />
             );
         }
@@ -493,29 +572,27 @@ function App() {
         return (
             <Login
                 onLogin={(loggedInUser) => {
+
                     if (loggedInUser) {
+
                         setUser(loggedInUser);
 
                         localStorage.setItem(
                             "user",
-                            JSON.stringify(
-                                loggedInUser
-                            )
+                            JSON.stringify(loggedInUser)
                         );
+
                     }
 
                     setIsLoggedIn(true);
+
                 }}
-                goToRegister={() => {
-                    setShowRegister(true);
-                }}
+                goToRegister={() =>
+                    setShowRegister(true)
+                }
             />
         );
     }
-
-    // =====================================================
-    // PAGE INFORMATION
-    // =====================================================
 
     const pageInfo = {
         dashboard: {
@@ -523,13 +600,11 @@ function App() {
             subtitle:
                 "Manage your tasks and stay productive."
         },
-
         tasks: {
             title: "My Tasks",
             subtitle:
                 "View, search and manage all your tasks."
         },
-
         important: {
             title: "Important",
             subtitle:
@@ -537,32 +612,15 @@ function App() {
         }
     };
 
-    // =====================================================
-    // RENDER
-    // =====================================================
-
     return (
         <div className="app">
 
-            {/* =================================================
-                SIDEBAR
-            ================================================= */}
-
             <aside className="sidebar">
 
-                {/* LOGO */}
-
                 <div className="logo">
-                    <div className="logo-icon">
-                        ✓
-                    </div>
-
-                    <span>
-                        TaskFlow
-                    </span>
+                    <div className="logo-icon">✓</div>
+                    <span>TaskFlow</span>
                 </div>
-
-                {/* NAVIGATION */}
 
                 <nav className="navigation">
 
@@ -573,13 +631,10 @@ function App() {
                                 : ""
                         }`}
                         onClick={() =>
-                            handleNavigation(
-                                "dashboard"
-                            )
+                            handleNavigation("dashboard")
                         }
                     >
                         <span>▦</span>
-
                         <span className="nav-text">
                             Dashboard
                         </span>
@@ -592,13 +647,10 @@ function App() {
                                 : ""
                         }`}
                         onClick={() =>
-                            handleNavigation(
-                                "tasks"
-                            )
+                            handleNavigation("tasks")
                         }
                     >
                         <span>✓</span>
-
                         <span className="nav-text">
                             My Tasks
                         </span>
@@ -611,21 +663,16 @@ function App() {
                                 : ""
                         }`}
                         onClick={() =>
-                            handleNavigation(
-                                "important"
-                            )
+                            handleNavigation("important")
                         }
                     >
                         <span>★</span>
-
                         <span className="nav-text">
                             Important
                         </span>
                     </button>
 
                 </nav>
-
-                {/* SIDEBAR USER */}
 
                 <div className="sidebar-bottom">
 
@@ -634,20 +681,16 @@ function App() {
                         <div className="avatar">
                             {user?.name
                                 ? user.name
-                                      .charAt(0)
-                                      .toUpperCase()
+                                    .charAt(0)
+                                    .toUpperCase()
                                 : "U"}
                         </div>
 
                         <div className="user-info">
                             <strong>
-                                {user?.name ||
-                                    "User"}
+                                {user?.name || "User"}
                             </strong>
-
-                            <small>
-                                Member
-                            </small>
+                            <small>Member</small>
                         </div>
 
                     </div>
@@ -655,17 +698,14 @@ function App() {
                     <button
                         className="logout-button"
                         onClick={() => {
-                            localStorage.removeItem(
-                                "token"
-                            );
 
-                            localStorage.removeItem(
-                                "user"
-                            );
+                            localStorage.removeItem("token");
+                            localStorage.removeItem("user");
 
                             setUser(null);
                             setTasks([]);
                             setIsLoggedIn(false);
+
                         }}
                     >
                         Logout
@@ -675,61 +715,138 @@ function App() {
 
             </aside>
 
-            {/* =================================================
-                MAIN CONTENT
-            ================================================= */}
-
             <main className="main-content">
-
-                {/* TOPBAR */}
 
                 <header className="topbar">
 
                     <div className="page-heading">
 
                         <h1>
-                            {
-                                pageInfo[
-                                    activePage
-                                ].title
-                            }
+                            {pageInfo[activePage].title}
                         </h1>
 
                         <p>
-                            {
-                                pageInfo[
-                                    activePage
-                                ].subtitle
-                            }
+                            {pageInfo[activePage].subtitle}
                         </p>
 
                     </div>
 
                     <div className="topbar-right">
 
-                        <button
-                            className="notification"
-                            title="Notifications"
+                        {/* NOTIFICATION */}
+
+                        <div
+                            className="notification-wrapper"
+                            ref={notificationRef}
                         >
-                            🔔
-                        </button>
+
+                            <button
+                                className="notification"
+                                onClick={() =>
+                                    setShowNotifications(
+                                        !showNotifications
+                                    )
+                                }
+                            >
+                                🔔
+
+                                {notificationCount > 0 && (
+                                    <span className="notification-badge">
+                                        {notificationCount > 9
+                                            ? "9+"
+                                            : notificationCount}
+                                    </span>
+                                )}
+
+                            </button>
+
+                            {showNotifications && (
+
+                                <div className="notification-panel">
+
+                                    <div className="notification-header">
+
+                                        <div>
+                                            <h3>
+                                                Notifications
+                                            </h3>
+
+                                            <p>
+                                                Task updates and reminders
+                                            </p>
+                                        </div>
+
+                                        <span>
+                                            {notifications.length}
+                                        </span>
+
+                                    </div>
+
+                                    <div className="notification-list">
+
+                                        {notifications.length === 0 ? (
+
+                                            <div className="notification-empty">
+                                                <div>🔔</div>
+                                                <h4>
+                                                    No notifications
+                                                </h4>
+                                                <p>
+                                                    You're all caught up!
+                                                </p>
+                                            </div>
+
+                                        ) : (
+
+                                            notifications.map((item) => (
+
+                                                <div
+                                                    className="notification-item"
+                                                    key={item.id}
+                                                >
+
+                                                    <div className="notification-icon">
+                                                        {item.icon}
+                                                    </div>
+
+                                                    <div>
+                                                        <strong>
+                                                            {item.title}
+                                                        </strong>
+
+                                                        <p>
+                                                            {item.message}
+                                                        </p>
+                                                    </div>
+
+                                                </div>
+
+                                            ))
+
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+                            )}
+
+                        </div>
 
                         <div className="profile">
 
                             <div className="avatar">
                                 {user?.name
                                     ? user.name
-                                          .charAt(0)
-                                          .toUpperCase()
+                                        .charAt(0)
+                                        .toUpperCase()
                                     : "U"}
                             </div>
 
                             <div>
                                 <strong>
-                                    {user?.name ||
-                                        "User"}
+                                    {user?.name || "User"}
                                 </strong>
-
                                 <small>
                                     My Account
                                 </small>
@@ -741,14 +858,8 @@ function App() {
 
                 </header>
 
-                {/* =================================================
-                    DASHBOARD
-                ================================================= */}
-
                 {activePage === "dashboard" && (
                     <>
-
-                        {/* WELCOME */}
 
                         <section className="welcome-section">
 
@@ -759,123 +870,73 @@ function App() {
                                 </span>
 
                                 <h2>
-                                    Hi!{" "}
-                                    {user?.name ||
-                                        "User"}{" "}
-                                    👋
+                                    Hi! {user?.name || "User"} 👋
                                 </h2>
 
                                 <p>
-                                    Here's what's
-                                    happening with
-                                    your tasks today.
+                                    Here's what's happening with your tasks today.
                                 </p>
 
                             </div>
 
                             <button
                                 className="add-button"
-                                onClick={
-                                    openAddModal
-                                }
+                                onClick={openAddModal}
                             >
-                                <span>＋</span>
-                                Add New Task
+                                ＋ Add New Task
                             </button>
 
                         </section>
 
-                        {/* STATISTICS */}
-
                         <section className="stats-grid">
 
                             <div className="stat-card">
-                                <div className="stat-icon">
-                                    📋
-                                </div>
-
+                                <div className="stat-icon">📋</div>
                                 <div>
-                                    <span>
-                                        Total Tasks
-                                    </span>
-
-                                    <h3>
-                                        {totalTasks}
-                                    </h3>
+                                    <span>Total Tasks</span>
+                                    <h3>{totalTasks}</h3>
                                 </div>
                             </div>
 
                             <div className="stat-card">
-                                <div className="stat-icon">
-                                    📝
-                                </div>
-
+                                <div className="stat-icon">📝</div>
                                 <div>
-                                    <span>
-                                        To Do
-                                    </span>
-
-                                    <h3>
-                                        {todoTasks}
-                                    </h3>
+                                    <span>To Do</span>
+                                    <h3>{todoTasks}</h3>
                                 </div>
                             </div>
 
                             <div className="stat-card">
-                                <div className="stat-icon">
-                                    ⚡
-                                </div>
-
+                                <div className="stat-icon">⚡</div>
                                 <div>
-                                    <span>
-                                        In Progress
-                                    </span>
-
-                                    <h3>
-                                        {inProgressTasks}
-                                    </h3>
+                                    <span>In Progress</span>
+                                    <h3>{inProgressTasks}</h3>
                                 </div>
                             </div>
 
                             <div className="stat-card">
-                                <div className="stat-icon">
-                                    ✓
-                                </div>
-
+                                <div className="stat-icon">✓</div>
                                 <div>
-                                    <span>
-                                        Completed
-                                    </span>
-
-                                    <h3>
-                                        {completedTasks}
-                                    </h3>
+                                    <span>Completed</span>
+                                    <h3>{completedTasks}</h3>
                                 </div>
                             </div>
 
                         </section>
-
-                        {/* PROGRESS */}
 
                         <section className="progress-card">
 
                             <div className="progress-header">
 
                                 <div>
-                                    <h2>
-                                        Task Progress
-                                    </h2>
-
+                                    <h2>Task Progress</h2>
                                     <p>
-                                        Your overall
-                                        task completion
+                                        Your overall task completion
                                     </p>
                                 </div>
 
                                 <strong>
-                                    {
-                                        completionPercentage
-                                    }%
+                                    {completionPercentage}%
                                 </strong>
 
                             </div>
@@ -891,20 +952,15 @@ function App() {
 
                             <div className="progress-info">
                                 <span>
-                                    {completedTasks} of{" "}
-                                    {totalTasks}{" "}
-                                    tasks completed
+                                    {completedTasks} of {totalTasks} tasks completed
                                 </span>
 
                                 <span>
-                                    {highPriorityTasks}{" "}
-                                    high priority
+                                    {highPriorityTasks} high priority
                                 </span>
                             </div>
 
                         </section>
-
-                        {/* RECENT TASKS */}
 
                         <TaskSection
                             title="Recent Tasks"
@@ -913,90 +969,60 @@ function App() {
                             loading={loading}
                             onAdd={openAddModal}
                             onEdit={handleEditTask}
-                            onDelete={
-                                handleDeleteTask
-                            }
+                            onDelete={handleDeleteTask}
                         />
 
                     </>
                 )}
 
-                {/* =================================================
-                    MY TASKS
-                ================================================= */}
-
                 {activePage === "tasks" && (
+
                     <TaskSection
                         title="All My Tasks"
                         subtitle={`${filteredTasks.length} task${
-                            filteredTasks.length !== 1
-                                ? "s"
-                                : ""
+                            filteredTasks.length !== 1 ? "s" : ""
                         } shown`}
                         tasks={filteredTasks}
                         loading={loading}
                         onAdd={openAddModal}
                         onEdit={handleEditTask}
-                        onDelete={
-                            handleDeleteTask
-                        }
+                        onDelete={handleDeleteTask}
                         search={search}
                         setSearch={setSearch}
-                        filterStatus={
-                            filterStatus
-                        }
-                        setFilterStatus={
-                            setFilterStatus
-                        }
-                        filterPriority={
-                            filterPriority
-                        }
-                        setFilterPriority={
-                            setFilterPriority
-                        }
-                        onReset={
-                            resetFilters
-                        }
+                        filterStatus={filterStatus}
+                        setFilterStatus={setFilterStatus}
+                        filterPriority={filterPriority}
+                        setFilterPriority={setFilterPriority}
+                        onReset={resetFilters}
                         showFilters={true}
                     />
+
                 )}
 
-                {/* =================================================
-                    IMPORTANT
-                ================================================= */}
-
                 {activePage === "important" && (
+
                     <TaskSection
                         title="Important Tasks"
                         subtitle={`${importantTasks.length} high-priority task${
-                            importantTasks.length !== 1
-                                ? "s"
-                                : ""
+                            importantTasks.length !== 1 ? "s" : ""
                         }`}
                         tasks={importantTasks}
                         loading={loading}
                         onAdd={openAddModal}
                         onEdit={handleEditTask}
-                        onDelete={
-                            handleDeleteTask
-                        }
+                        onDelete={handleDeleteTask}
                     />
+
                 )}
 
             </main>
 
-            {/* =================================================
-                TASK MODAL
-            ================================================= */}
-
             {showTaskModal && (
+
                 <div
                     className="modal-overlay"
                     onMouseDown={(e) => {
-                        if (
-                            e.target ===
-                            e.currentTarget
-                        ) {
+                        if (e.target === e.currentTarget) {
                             closeTaskModal();
                         }
                     }}
@@ -1004,15 +1030,12 @@ function App() {
 
                     <div className="task-modal">
 
-                        {/* MODAL HEADER */}
-
                         <div className="modal-header">
 
                             <div>
+
                                 <span className="modal-icon">
-                                    {editingTask
-                                        ? "✏️"
-                                        : "＋"}
+                                    {editingTask ? "✏️" : "＋"}
                                 </span>
 
                                 <div>
@@ -1028,84 +1051,58 @@ function App() {
                                             : "Add a new task to your workspace."}
                                     </p>
                                 </div>
+
                             </div>
 
                             <button
                                 className="modal-close"
-                                onClick={
-                                    closeTaskModal
-                                }
-                                type="button"
+                                onClick={closeTaskModal}
                             >
                                 ×
                             </button>
 
                         </div>
 
-                        {/* FORM */}
-
                         <form
                             className="task-form"
-                            onSubmit={
-                                handleTaskSubmit
-                            }
+                            onSubmit={handleTaskSubmit}
                         >
 
                             <div className="form-group">
-
-                                <label>
-                                    Task Title
-                                </label>
+                                <label>Task Title</label>
 
                                 <input
                                     type="text"
-                                    placeholder="Enter task title"
                                     value={title}
+                                    placeholder="Enter task title"
                                     onChange={(e) =>
-                                        setTitle(
-                                            e.target.value
-                                        )
+                                        setTitle(e.target.value)
                                     }
                                     required
-                                    autoFocus
                                 />
-
                             </div>
 
                             <div className="form-group">
-
-                                <label>
-                                    Description
-                                </label>
+                                <label>Description</label>
 
                                 <textarea
+                                    value={description}
                                     placeholder="Describe your task..."
-                                    value={
-                                        description
-                                    }
                                     onChange={(e) =>
-                                        setDescription(
-                                            e.target.value
-                                        )
+                                        setDescription(e.target.value)
                                     }
                                 />
-
                             </div>
 
                             <div className="form-row">
 
                                 <div className="form-group">
-
-                                    <label>
-                                        Status
-                                    </label>
+                                    <label>Status</label>
 
                                     <select
                                         value={status}
                                         onChange={(e) =>
-                                            setStatus(
-                                                e.target.value
-                                            )
+                                            setStatus(e.target.value)
                                         }
                                     >
                                         <option value="todo">
@@ -1120,23 +1117,15 @@ function App() {
                                             Completed
                                         </option>
                                     </select>
-
                                 </div>
 
                                 <div className="form-group">
-
-                                    <label>
-                                        Priority
-                                    </label>
+                                    <label>Priority</label>
 
                                     <select
-                                        value={
-                                            priority
-                                        }
+                                        value={priority}
                                         onChange={(e) =>
-                                            setPriority(
-                                                e.target.value
-                                            )
+                                            setPriority(e.target.value)
                                         }
                                     >
                                         <option value="low">
@@ -1151,39 +1140,28 @@ function App() {
                                             High
                                         </option>
                                     </select>
-
                                 </div>
 
                             </div>
 
                             <div className="form-group">
-
-                                <label>
-                                    Due Date
-                                </label>
+                                <label>Due Date</label>
 
                                 <input
                                     type="date"
                                     value={dueDate}
                                     onChange={(e) =>
-                                        setDueDate(
-                                            e.target.value
-                                        )
+                                        setDueDate(e.target.value)
                                     }
                                 />
-
                             </div>
-
-                            {/* MODAL ACTIONS */}
 
                             <div className="modal-actions">
 
                                 <button
                                     type="button"
                                     className="cancel-button"
-                                    onClick={
-                                        closeTaskModal
-                                    }
+                                    onClick={closeTaskModal}
                                 >
                                     Cancel
                                 </button>
@@ -1207,16 +1185,12 @@ function App() {
                     </div>
 
                 </div>
+
             )}
 
         </div>
     );
 }
-
-
-/* =========================================================
-   TASK SECTION COMPONENT
-========================================================= */
 
 function TaskSection({
     title,
@@ -1235,19 +1209,16 @@ function TaskSection({
     onReset,
     showFilters = false
 }) {
+
     return (
+
         <section className="tasks-section">
 
             <div className="section-heading">
 
                 <div>
-                    <h2>
-                        {title}
-                    </h2>
-
-                    <p>
-                        {subtitle}
-                    </p>
+                    <h2>{title}</h2>
+                    <p>{subtitle}</p>
                 </div>
 
                 <button
@@ -1259,9 +1230,8 @@ function TaskSection({
 
             </div>
 
-            {/* FILTERS */}
-
             {showFilters && (
+
                 <div className="filter-section">
 
                     <input
@@ -1269,32 +1239,21 @@ function TaskSection({
                         placeholder="🔍 Search tasks..."
                         value={search}
                         onChange={(e) =>
-                            setSearch(
-                                e.target.value
-                            )
+                            setSearch(e.target.value)
                         }
                     />
 
                     <select
                         value={filterStatus}
                         onChange={(e) =>
-                            setFilterStatus(
-                                e.target.value
-                            )
+                            setFilterStatus(e.target.value)
                         }
                     >
-                        <option value="all">
-                            All Status
-                        </option>
-
-                        <option value="todo">
-                            To Do
-                        </option>
-
+                        <option value="all">All Status</option>
+                        <option value="todo">To Do</option>
                         <option value="in-progress">
                             In Progress
                         </option>
-
                         <option value="completed">
                             Completed
                         </option>
@@ -1303,26 +1262,13 @@ function TaskSection({
                     <select
                         value={filterPriority}
                         onChange={(e) =>
-                            setFilterPriority(
-                                e.target.value
-                            )
+                            setFilterPriority(e.target.value)
                         }
                     >
-                        <option value="all">
-                            All Priority
-                        </option>
-
-                        <option value="low">
-                            Low
-                        </option>
-
-                        <option value="medium">
-                            Medium
-                        </option>
-
-                        <option value="high">
-                            High
-                        </option>
+                        <option value="all">All Priority</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
                     </select>
 
                     <button
@@ -1333,31 +1279,25 @@ function TaskSection({
                     </button>
 
                 </div>
-            )}
 
-            {/* TASK LIST */}
+            )}
 
             <div className="task-list">
 
                 {loading && tasks.length === 0 ? (
+
                     <div className="loading-state">
                         <div className="loading-spinner"></div>
-
-                        <p>
-                            Loading tasks...
-                        </p>
+                        <p>Loading tasks...</p>
                     </div>
+
                 ) : tasks.length === 0 ? (
 
                     <div className="empty-state">
 
-                        <div className="empty-icon">
-                            📋
-                        </div>
+                        <div className="empty-icon">📋</div>
 
-                        <h3>
-                            No tasks found
-                        </h3>
+                        <h3>No tasks found</h3>
 
                         <p>
                             {showFilters
@@ -1377,6 +1317,7 @@ function TaskSection({
                 ) : (
 
                     tasks.map((task) => (
+
                         <div
                             className="task-card"
                             key={task._id}
@@ -1386,23 +1327,19 @@ function TaskSection({
 
                                 <div
                                     className={`task-check ${
-                                        task.status ===
-                                        "completed"
+                                        task.status === "completed"
                                             ? "completed"
                                             : ""
                                     }`}
                                 >
-                                    {task.status ===
-                                    "completed"
+                                    {task.status === "completed"
                                         ? "✓"
                                         : "○"}
                                 </div>
 
                                 <div className="task-content">
 
-                                    <h3>
-                                        {task.title}
-                                    </h3>
+                                    <h3>{task.title}</h3>
 
                                     <p>
                                         {task.description ||
@@ -1418,12 +1355,10 @@ function TaskSection({
                                 <span
                                     className={`status-badge ${task.status}`}
                                 >
-                                    {task.status ===
-                                    "in-progress"
-                                        ? "In Progress"
-                                        : task.status ===
-                                          "todo"
-                                            ? "To Do"
+                                    {task.status === "todo"
+                                        ? "To Do"
+                                        : task.status === "in-progress"
+                                            ? "In Progress"
                                             : "Completed"}
                                 </span>
 
@@ -1437,17 +1372,14 @@ function TaskSection({
                                     📅{" "}
                                     {task.dueDate
                                         ? new Date(
-                                              task.dueDate
-                                          ).toLocaleDateString()
+                                            task.dueDate
+                                        ).toLocaleDateString()
                                         : "No date"}
                                 </span>
 
                                 <button
                                     className="edit-button"
-                                    onClick={() =>
-                                        onEdit(task)
-                                    }
-                                    title="Edit task"
+                                    onClick={() => onEdit(task)}
                                 >
                                     ✏️
                                 </button>
@@ -1455,11 +1387,8 @@ function TaskSection({
                                 <button
                                     className="delete-button"
                                     onClick={() =>
-                                        onDelete(
-                                            task._id
-                                        )
+                                        onDelete(task._id)
                                     }
-                                    title="Delete task"
                                 >
                                     🗑️
                                 </button>
@@ -1467,6 +1396,7 @@ function TaskSection({
                             </div>
 
                         </div>
+
                     ))
 
                 )}
@@ -1474,6 +1404,7 @@ function TaskSection({
             </div>
 
         </section>
+
     );
 }
 

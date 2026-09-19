@@ -12,12 +12,12 @@ function App() {
     // =====================================================
 
     const [isLoggedIn, setIsLoggedIn] = useState(
-        !!localStorage.getItem("token")
+        !!sessionStorage.getItem("token")
     );
 
     const [user, setUser] = useState(() => {
         try {
-            const savedUser = localStorage.getItem("user");
+            const savedUser = sessionStorage.getItem("user");
             return savedUser ? JSON.parse(savedUser) : null;
         } catch {
             return null;
@@ -294,7 +294,7 @@ function App() {
     const fetchTasks = async () => {
 
         const currentToken =
-            localStorage.getItem("token");
+            sessionStorage.getItem("token");
 
         if (!currentToken) {
             setIsLoggedIn(false);
@@ -325,8 +325,8 @@ function App() {
 
                 if (response.status === 401) {
 
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
+                    sessionStorage.removeItem("token");
+                    sessionStorage.removeItem("user");
 
                     setUser(null);
                     setTasks([]);
@@ -365,7 +365,7 @@ function App() {
         e.preventDefault();
 
         const currentToken =
-            localStorage.getItem("token");
+            sessionStorage.getItem("token");
 
         if (!currentToken) {
             setIsLoggedIn(false);
@@ -475,7 +475,7 @@ function App() {
         ) return;
 
         const currentToken =
-            localStorage.getItem("token");
+            sessionStorage.getItem("token");
 
         try {
 
@@ -577,7 +577,7 @@ function App() {
 
                         setUser(loggedInUser);
 
-                        localStorage.setItem(
+                        sessionStorage.setItem(
                             "user",
                             JSON.stringify(loggedInUser)
                         );
@@ -699,8 +699,8 @@ function App() {
                         className="logout-button"
                         onClick={() => {
 
-                            localStorage.removeItem("token");
-                            localStorage.removeItem("user");
+                            sessionStorage.removeItem("token");
+                            sessionStorage.removeItem("user");
 
                             setUser(null);
                             setTasks([]);

@@ -2836,3 +2836,81 @@ select:focus-visible {
     }
 
 }
+
+/* =========================
+   MOBILE HEIGHT FIX
+   ========================= */
+
+@media (max-width: 768px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    height: auto;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+
+  .app,
+  .dashboard-container,
+  .dashboard-layout {
+    min-height: 100vh;
+    height: auto;
+  }
+
+  /* Sidebar / mobile navigation */
+  .sidebar {
+    height: auto;
+    min-height: auto;
+  }
+
+  /* Main content should be allowed to grow */
+  .main-content {
+    height: auto;
+    min-height: calc(100vh - 60px);
+    overflow: visible;
+    padding-bottom: 30px;
+  }
+
+  /* Profile / username area */
+  .user-profile,
+  .profile-section {
+    position: relative;
+    bottom: auto;
+    margin-top: 20px;
+  }
+}
+
+/* Smaller phones */
+@media (max-width: 480px) {
+  .main-content {
+    padding-bottom: 40px;
+  }
+
+  .user-profile,
+  .profile-section {
+    margin-bottom: 20px;
+  }
+}
+
+/* Mobile sidebar height fix */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: auto;
+
+        width: 255px;
+        height: 100dvh;
+        min-height: 100dvh;
+
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        padding-bottom: 25px;
+    }
+}
